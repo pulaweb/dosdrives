@@ -106,30 +106,30 @@ void DPMI_DOSfree (WORD *selector);
 
 
 int main (void) {
-	int bios_ext_major = 0;               // simply info
-	int bios_ext_minor = 0;
-	WORD bios_ext_api = 0;                // api support
+    int bios_ext_major = 0;               // simply info
+    int bios_ext_minor = 0;
+    WORD bios_ext_api = 0;                // api support
 
-	WORD DriveParam_RealSegment = 0;      // for hard disk drive parameters
-	WORD DriveParam_MemSelector = 0;      // for hard disk drive parameters
-	DRIVEPARAM *DriveParam;               // for hard disk drive parameters
-	CONFIGPARAM *ConfigParam;
-	DPMIREGS dpmiregs;
-	int i;
+    WORD DriveParam_RealSegment = 0;      // for hard disk drive parameters
+    WORD DriveParam_MemSelector = 0;      // for hard disk drive parameters
+    DRIVEPARAM *DriveParam;               // for hard disk drive parameters
+    CONFIGPARAM *ConfigParam;
+    DPMIREGS dpmiregs;
+    int i;
 	
 	
-	// check int 13h extensions supported
+    // check int 13h extensions supported
     memset(&dpmiregs, 0, sizeof(DPMIREGS));
     dpmiregs.eax = 0x4100;
     dpmiregs.ebx = 0x55aa;
     dpmiregs.edx = 0x80;
     DPMI_SimulateRMI(0x13, &dpmiregs);
     if (dpmiregs.flags & 1) {
-		printf("Sorry INT13H extensions not supported or no hard drive!\n");
+        printf("Sorry INT13H extensions not supported or no hard drive!\n");
         exit(0);
     }
     if (LOWORD(dpmiregs.ebx) != 0xaa55) {
-		printf("Sorry INT13H extensions not active or no hard drive!\n");
+        printf("Sorry INT13H extensions not active or no hard drive!\n");
         exit(0);
     }
 
@@ -143,13 +143,13 @@ int main (void) {
     // allocate low DOS memory for drive param buffer
     if (!DPMI_DOSmalloc(512, &DriveParam_RealSegment, &DriveParam_MemSelector)) {
         // DPMI_DOSMalloc error
-		printf("Error allocating DOS memory");
+        printf("Error allocating DOS memory");
         exit(0);
     }
     DriveParam = (DRIVEPARAM *) (DriveParam_RealSegment << 4);
 
 
-	// BIOS hard drives start from 0x80
+    // BIOS hard drives start from 0x80
     i = 0x80;
     while (i < 0x100) {
 
@@ -172,34 +172,33 @@ int main (void) {
 
         if (!(dpmiregs.flags & 1) && !HIBYTE(dpmiregs.eax) && DriveParam->total_sectors) {   // test if no CF set and no error code in AH
 
-			// int 13h extensions must be verison 2 or higher and config param structure must be filled
-			if ((bios_ext_major >= 2) && (bios_ext_api & 0x01) && (DriveParam->config_param != 0xFFFFFFFF)) {
-				// set config param structure
-				ConfigParam = (CONFIGPARAM *) ( ((DriveParam->config_param >> 16) << 4) + (WORD)DriveParam->config_param );
+            // int 13h extensions must be verison 2 or higher and config param structure must be filled
+            if ((bios_ext_major >= 2) && (bios_ext_api & 0x01) && (DriveParam->config_param != 0xFFFFFFFF)) {
+                // set config param structure
+                ConfigParam = (CONFIGPARAM *) ( ((DriveParam->config_param >> 16) << 4) + (WORD)DriveParam->config_param );
 
-				// skip detection via ATA/SATA if buffer size is less than 30, config_param pointer is not returned in this case
-				if ((DriveParam->buffer_size < 30) || (ConfigParam == NULL)) break;
+                    // skip detection via ATA/SATA if buffer size is less than 30, config_param pointer is not returned in this case
+                    if ((DriveParam->buffer_size < 30) || (ConfigParam == NULL)) break;
 
-				if (DriveParam->info_flags & (1 + 4) && !DriveParam->config_param) {
-					// removable drive
-				} else {
-					// hard drive
-					if (ConfigParam->flags & 0x10) printf ("HDD 0x%x is slave, HDD Base port is: 0x%x, HDD Control port is: 0x%x\n", i, ConfigParam->base_port, ConfigParam->control_port);
-					else printf ("HDD 0x%x is master, HDD Base port is: 0x%x, HDD Control port is: 0x%x\n", i, ConfigParam->base_port, ConfigParam->control_port);
-				}
-			} else {
-				printf ("INT 13h extensions version too low to detect hard drive base and control port!\n");
-			}
-		}
-		// next drive
-		i++;
+                    if (DriveParam->info_flags & (1 + 4) && !DriveParam->config_param) {
+                        // removable drive
+                    } else {
+                        // hard drive
+                        if (ConfigParam->flags & 0x10) printf ("HDD 0x%x is slave, HDD Base port is: 0x%x, HDD Control port is: 0x%x\n", i, ConfigParam->base_port, ConfigParam->control_port);
+                        else printf ("HDD 0x%x is master, HDD Base port is: 0x%x, HDD Control port is: 0x%x\n", i, ConfigParam->base_port, ConfigParam->control_port);
+                    }
+            } else {
+                printf ("INT 13h extensions version too low to detect hard drive base and control port!\n");
+            }
+        }
+        // next drive
+        i++;
     }
     return 1;
 }
 
 
 /******************/
-
 /* DPMI functions */
 /******************/
 
@@ -213,9 +212,9 @@ BOOL DPMI_SimulateRMI (BYTE IntNum, DPMIREGS *regs) {
         mov bl, [IntNum]
         mov eax, 0x300
         int 0x31
-		setnc [noerror]
-	}	
-	return noerror;
+        setnc [noerror]
+        }	
+        return noerror;
 }
 
 BOOL DPMI_DOSmalloc (QWORD size, WORD *segment, WORD *selector) {
@@ -227,22 +226,22 @@ BOOL DPMI_DOSmalloc (QWORD size, WORD *segment, WORD *selector) {
         add ebx, 0x0f
         shr ebx, 4
         int 0x31
-		setnc [noerror]
-		mov ebx, [segment]
-		mov [ebx], ax
-		mov ebx, [selector]
-		mov [ebx], dx
-	}
-	return noerror;
+        setnc [noerror]
+        mov ebx, [segment]
+        mov [ebx], ax
+        mov ebx, [selector]
+        mov [ebx], dx
+        }
+        return noerror;
 }
 
 void DPMI_DOSfree (WORD *selector) {
 	
 	_asm {
-		mov eax, [selector]
-		mov dx, [eax]
-		mov eax, 0x101
-		int 0x31
-	}
+        mov eax, [selector]
+        mov dx, [eax]
+        mov eax, 0x101
+        int 0x31
+        }
 }
 
