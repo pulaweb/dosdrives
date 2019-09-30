@@ -178,8 +178,11 @@ int main (void) {
                 ConfigParam = (CONFIGPARAM *) ( ((DriveParam->config_param >> 16) << 4) + (WORD)DriveParam->config_param );
 
                     // skip detection via ATA/SATA if buffer size is less than 30, config_param pointer is not returned in this case
-                    if ((DriveParam->buffer_size < 30) || (ConfigParam == NULL)) break;
-
+                    if ((DriveParam->buffer_size < 30) || (ConfigParam == NULL)) {
+			printf("Config parameters structure not found for 0x%x HDD\n", i);
+			break;
+		    }
+		    
                     if (DriveParam->info_flags & (1 + 4) && !DriveParam->config_param) {
                         // removable drive
                     } else {
@@ -188,7 +191,7 @@ int main (void) {
                         else printf ("HDD 0x%x is master, HDD Base port is: 0x%x, HDD Control port is: 0x%x\n", i, ConfigParam->base_port, ConfigParam->control_port);
                     }
             } else {
-                printf ("INT 13h extensions version too low to detect hard drive base and control port!\n");
+                printf ("INT 13h extensions version too low or no config parameters structure.\nUnable to detect hard drive base and control port!\n");
             }
         }
         // next drive
