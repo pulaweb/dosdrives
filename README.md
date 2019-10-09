@@ -1,5 +1,5 @@
 # dosdrives
-Watcom C - Simple hard drives detection for 32-bit protected mode using INT 13h API under a DOS extender and ATA identify command. Written by Piotr Ulaszewski on the 7th of October 2019. This is just a emonstartion on how to obtain hard drive info on any ATA legacy system.
+Watcom C - Simple hard drives detection for 32-bit protected mode using INT 13h API under a DOS extender and ATA identify command. Written by Piotr Ulaszewski on the 7th of October 2019. This is just a demonstartion on how to obtain hard drive info on any ATA legacy system.
 
 MIT License text : Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
