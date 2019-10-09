@@ -1,1 +1,1 @@
-wcl386 /d2 /l=dos32a /bt=dos drives.c
+wcl386 /d2 /l=dos32a /bt=dos drives.c ata.c
