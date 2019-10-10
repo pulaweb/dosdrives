@@ -36,9 +36,6 @@ BYTE lbalow815_register = 0;
 BYTE count07_register = 0;
 BYTE count815_register = 0;
 
-BOOL read_error = FALSE;
-BOOL write_error = FALSE;
-
 // temporary string buffer
 char tmpstring[1024];
 

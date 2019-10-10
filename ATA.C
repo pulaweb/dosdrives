@@ -33,272 +33,15 @@ extern BYTE lbalow815_register;
 extern BYTE count07_register;
 extern BYTE count815_register;
 
-extern BOOL read_error;
-extern BOOL write_error;
-
 WORD buff[256];
 
+// direction 0 - no data, 1 - from drive, 2 - to drive
 BOOL ata_send_command (BYTE command, BYTE features, BYTE count, BYTE direction, DISKDRIVE *sdrive, BYTE *buffer)
 {
-    unsigned __int64 Frequency;
-    unsigned __int64 WaitStart;
-    unsigned __int64 WaitEnd;
-    DWORD WaitTime;
-
-// Read Function Write Function
-// ----------------------------------------------------------------------
-// 0 1 0 0 0 1 F0 Data Register / Data Register
-// 0 1 0 0 1 1 F1 Error Register / (Write Precomp Reg.)
-// 0 1 0 1 0 1 F2 Sector / Count Sector Count
-// 0 1 0 1 1 1 F3 Sector Number / Sector Number
-// 0 1 1 0 0 1 F4 Cylinder Low / Cylinder Low
-// 0 1 1 0 1 1 F5 Cylinder High / Cylinder High
-// 0 1 1 1 0 1 F6 SDH Register / SDH Register
-// 0 1 1 1 1 1 F7 Status Register / Command Register
-// ----------------------------------------------------------------------
-// status register flags
-// Bit 7: BSY (Busy) Set when the drive is busy and unable to process any new ATA commands.
-// Bit 6: DRDY (Data Ready) Set when the device is ready to accept ATA commands from the host.
-// Bit 5: DWF (Drive Write Fault) Always set to 0.
-// Bit 4: DSC (Drive Seek Complete) Set when the drive heads have been positioned over a specific track.
-// Bit 3: DRQ (Data Request) Set when device is read to transfer a word or byte of data to or from the host and the device.
-// Bit 2: CORR (Corrected Data) Always set to 0.
-// Bit 1: IDX (Index) Always set to 0.
-// Bit 0: ERR (Error) Set when an error occurred during the previous ATA command.
-
-
-    // get direct access ports
-    WORD ata_base = sdrive->ata_base;
-    WORD ata_ctrl = sdrive->ata_ctrl;
-    BOOL ata_master = sdrive->ata_master;
-	BYTE *bufferptr = buffer;
-    WORD in_val = 0;
-    int idx = 0;
-
-    QueryPerformanceFrequency (&Frequency);   // frequency of the high resolution timer - ticks for 1 ns
-
-    // wait for controller not busy
-    QueryPerformanceCounter (&WaitStart);
-    while (TRUE) {
-        in_val = inp(ata_base + 7);
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        // try to reset controller if error flag present (0x3f6 and 0x376 control registers)
-        if ((in_val & 0x01) == 0x01) {
-            outp(ata_ctrl, 0x06);          // perform device reset (SRST + nIEN bits)
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            delay(10);
-            outp(ata_ctrl, 0x02);          // perform device reset (nIEN bits)
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            delay(10);
-        }
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        if (((in_val & 0x40) == 0x40) && ((in_val & 0x80) == 0x00)) break;
-        QueryPerformanceCounter (&WaitEnd);
-        WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
-        if (WaitTime > TIMEOUT) {
-            write_error = 1;
-            status_register = in_val;
-            error_register = inp(ata_base + 1);
-            return FALSE;
-        }
-    }
-    
-    // check if SMART enable/disable command
-    if (command == SMART_CMD) {
-        outp(ata_base + 6, (ata_master ? 0xA0 : 0xB0));   // head register - set master or slave drive
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 5, SMART_CYL_HI);  // cylinder high register
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 4, SMART_CYL_LOW); // cylinder low register
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 3, 1);             // sector number reg
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 2, count);             // sector count reg
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 1, features);  // subcommand register
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        outp(ata_base + 7, command);     // command register - Command is 0xB0 for SMART commands
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-    } else {
-
-        // device - master/slave
-        outp(ata_base + 6, (ata_master ? (0xA0 + 0x40) : (0xB0 + 0x40 )));
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // LBA high
-        outp(ata_base + 5, 0);                                        // cylinder high register (23-16 lba)
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // LBA mid
-        outp(ata_base + 4, 0);                                        // cylinder low register (15-8 lba)
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // LBA low
-        outp(ata_base + 3, 0);                                        // sector number (0-7 lba)
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // sector count
-        outp(ata_base + 2, count);                                    // sector count reg - count
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // feature
-        outp(ata_base + 1, features);
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-
-        // command
-        outp(ata_base + 7, command);
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-    }
-
-    // Wait for data ready
-    QueryPerformanceCounter (&WaitStart);
-    while (TRUE) {
-        in_val = inp(ata_base + 7);
-        if ((in_val & 0x01) == 0x01) {
-            read_error = 1;
-            status_register = in_val;
-            error_register = inp(ata_base + 1);
-            return FALSE;                            // ERR - Drive error condition
-        }
-        if ((in_val & 0x80) == 0x00) break;          // Drive not in BSY state
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        _asm nop;
-        QueryPerformanceCounter (&WaitEnd);
-        WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
-        // unlimited wait time for secure erase 0xf4
-        if ((command != 0xf4) && (WaitTime > TIMEOUT)) {
-            read_error = 1;
-            // status_register = in_val;
-            // error_register = inp(ata_base + 1);
-            status_register = 0xff;
-            error_register = 0xff;
-            return FALSE;
-        }
-    }
-
-    // read 256 words if command returns data
-    if ((in_val & 0x48) == 0x48) {
-        if (direction == 1) {
-            // receive
-            for (idx = 0; idx != 256; idx++) buff[idx] = inpw(ata_base);
-            memcpy(bufferptr, buff, 512);
-        }
-        
-        if (direction == 2) {
-            // send
-            memcpy(buff, bufferptr, 512);
-            for (idx = 0; idx != 256; idx++) outpw(ata_base, buff[idx]); 
-        }
-
-        QueryPerformanceCounter (&WaitStart);
-        while (TRUE) {
-            in_val = inp(ata_base + 7);
-            if ((in_val & 0x01) == 0x01) {
-                write_error = 1;
-                status_register = in_val;
-                error_register = inp(ata_base + 1);
-                return FALSE;                                // drive error ERR
-            }
-            if ((in_val & 0x80) == 0x00) break;              // drive not in BSY state
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            _asm nop;
-            QueryPerformanceCounter (&WaitEnd);
-            WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
-
-		    // unlimited wait time for secure erase 0xf4
-            if (WaitTime > TIMEOUT) {
-                write_error = 1;
-                // status_register = in_val;
-                // error_register = inp(ata_base + 1);
-                status_register = 0xff;
-                error_register = 0xff;
-                return FALSE;
-            }
-        }
-    }
-
-    // return status
-    delay(10);
-    status_register = in_val;
-    error_register = inp(ata_base + 1);
-    
-    device_register = inp(ata_base + 6);
-    chigh_register = inp(ata_base + 5);
-    clow_register = inp(ata_base + 4);
-    sector_register = inp(ata_base + 3);
-    count_register = inp(ata_base + 2);
-
-    if (error_register) return FALSE;
-    return TRUE;
+    return ata_send_command_extended (command, features, count, 0, 0, 0, 0, direction, sdrive, buffer);
 }
 
 // direction 0 - no data, 1 - from drive, 2 - to drive
-// + 7, + 1, +2, +3, +4, +5, +6
 BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE sector, BYTE clow, BYTE chigh, BYTE device, BYTE direction, DISKDRIVE *sdrive, BYTE *buffer)
 {
     unsigned __int64 Frequency;
@@ -332,11 +75,11 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
     WORD ata_base = sdrive->ata_base;
     WORD ata_ctrl = sdrive->ata_ctrl;
     BOOL ata_master = sdrive->ata_master;
-	BYTE *bufferptr = buffer;
+    BYTE *bufferptr = buffer;
     WORD in_val = 0;
     int idx = 0;
 
-    QueryPerformanceFrequency (&Frequency);   // frequency of the high resolution timer - ticks for 1 ns
+    QueryPerformanceFrequency (&Frequency);     // frequency of the high resolution timer - ticks for 1 ns
 
     // wait for controller not busy
     QueryPerformanceCounter (&WaitStart);
@@ -346,14 +89,14 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
         _asm nop;
         _asm nop;
         _asm nop;
-        if (in_val & 0x80) {          // Drive in BSY state, try to reset controller - 0x3f6 and 0x376 control registers
-            outp(ata_ctrl, 0x06);          // perform device reset (SRST + nIEN bits)
+        if (in_val & 0x80) {                    // Drive in BSY state, try to reset controller
+            outp(ata_ctrl, 0x06);               // perform device reset (SRST + nIEN bits)
             _asm nop;
             _asm nop;
             _asm nop;
             _asm nop;
             delay(10);
-            outp(ata_ctrl, 0x02);          // perform device reset (nIEN bits)
+            outp(ata_ctrl, 0x02);               // perform device reset (nIEN bits)
             _asm nop;
             _asm nop;
             _asm nop;
@@ -368,7 +111,6 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
         QueryPerformanceCounter (&WaitEnd);
         WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
         if (WaitTime > TIMEOUT) {
-            write_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;
@@ -429,7 +171,6 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
     while (TRUE) {
         in_val = inp(ata_base + 7);
         if ((in_val & 0x01) == 0x01) {
-            read_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;                            // ERR - Drive error condition
@@ -443,7 +184,6 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
         WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
         // unlimited wait time for secure erase 0xf4
         if ((command != 0xf4) && (WaitTime > TIMEOUT)) {
-            read_error = 1;
             // status_register = in_val;
             // error_register = inp(ata_base + 1);
             status_register = 0xff;
@@ -475,7 +215,6 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
     while (TRUE) {
         in_val = inp(ata_base + 7);
         if ((in_val & 0x01) == 0x01) {
-            write_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;                                // drive error ERR
@@ -490,7 +229,6 @@ BOOL ata_send_command_extended (BYTE command, BYTE features, BYTE count, BYTE se
 
         // unlimited wait time for secure erase 0xf4
         if ((command != 0xf4) && (WaitTime > TIMEOUT)) {
-            write_error = 1;
             // status_register = in_val;
             // error_register = inp(ata_base + 1);
             status_register = 0xff;
@@ -546,11 +284,11 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
     WORD ata_base = sdrive->ata_base;
     WORD ata_ctrl = sdrive->ata_ctrl;
     BOOL ata_master = sdrive->ata_master;
-	BYTE *bufferptr = buffer;
+    BYTE *bufferptr = buffer;
     WORD in_val = 0;
     int idx = 0;
 
-    QueryPerformanceFrequency (&Frequency);   // frequency of the high resolution timer - ticks for 1 ns
+    QueryPerformanceFrequency (&Frequency);     // frequency of the high resolution timer - ticks for 1 ns
 
     // wait for controller not busy
     QueryPerformanceCounter (&WaitStart);
@@ -560,14 +298,14 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
         _asm nop;
         _asm nop;
         _asm nop;
-        if (in_val & 0x80) {          // Drive in BSY state, try to reset controller - 0x3f6 and 0x376 control registers
-            outp(ata_ctrl, 0x06);          // perform device reset (SRST + nIEN bits)
+        if (in_val & 0x80) {                    // Drive in BSY state, try to reset controller
+            outp(ata_ctrl, 0x06);               // perform device reset (SRST + nIEN bits)
             _asm nop;
             _asm nop;
             _asm nop;
             _asm nop;
             delay(10);
-            outp(ata_ctrl, 0x02);          // perform device reset (nIEN bits)
+            outp(ata_ctrl, 0x02);               // perform device reset (nIEN bits)
             _asm nop;
             _asm nop;
             _asm nop;
@@ -582,7 +320,6 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
         QueryPerformanceCounter (&WaitEnd);
         WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
         if (WaitTime > TIMEOUT) {
-            write_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;
@@ -625,7 +362,7 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
     _asm nop;
 
     // previous content
-    outp(ata_base + 1, (BYTE)featuresh);                                            // features high
+    outp(ata_base + 1, (BYTE)featuresh);                              // features high
     _asm nop;
     _asm nop;
     _asm nop;
@@ -685,7 +422,6 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
     while (TRUE) {
         in_val = inp(ata_base + 7);
         if ((in_val & 0x01) == 0x01) {
-            read_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;                            // ERR - Drive error condition
@@ -699,7 +435,6 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
         WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
         // unlimited wait time for secure erase 0xf4
         if ((command != 0xf4) && (WaitTime > TIMEOUT)) {
-            read_error = 1;
             // status_register = in_val;
             // error_register = inp(ata_base + 1);
             status_register = 0xff;
@@ -731,7 +466,6 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
     while (TRUE) {
         in_val = inp(ata_base + 7);
         if ((in_val & 0x01) == 0x01) {
-            write_error = 1;
             status_register = in_val;
             error_register = inp(ata_base + 1);
             return FALSE;                                // drive error ERR
@@ -745,7 +479,6 @@ BOOL ata_send_command_extended_48bit (BYTE command, BYTE features, BYTE count, B
         WaitTime = (DWORD) ((unsigned __int64)(1000 * (WaitEnd - WaitStart)/Frequency));   // calculate wait time in ms
 
         if (WaitTime > TIMEOUT) {
-            write_error = 1;
             // status_register = in_val;
             // error_register = inp(ata_base + 1);
             status_register = 0xff;
