@@ -3,7 +3,7 @@
 Watcom C - Simple ATA commands for 32-bit protected mode
 The user is responsible to make sure enough allocated memory is available when passing the buffer pointer
 Written by Piotr Ulaszewski (pulaweb) on the 7th of October 2019
-This is just a emonstartion on how to obtain hard drive info on any ATA legacy system
+This is just a demonstartion on how to obtain hard drive info on any ATA legacy system
 */
 
 #include <stdio.h>
