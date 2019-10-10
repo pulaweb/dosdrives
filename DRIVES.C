@@ -2,7 +2,7 @@
 /*
 Watcom C - Simple hard drives detection for 32-bit protected mode using INT 13h API under a DOS extender
 Written by Piotr Ulaszewski (pulaweb) on the 7th of October 2019
-This is just a emonstartion on how to obtain hard drive info on any ATA legacy system
+This is just a demonstartion on how to obtain hard drive info on any ATA legacy system
 */
 
 #include <stdlib.h>
